@@ -472,15 +472,18 @@ class BaseConnection:
             self.system_host_keys = system_host_keys
             self.alt_host_keys = alt_host_keys
             self.alt_key_file = alt_key_file
+            self.disabled_algorithms = disabled_algorithms
 
-            if disabled_algorithms:
-                self.disabled_algorithms = disabled_algorithms
-            else:
-                self.disabled_algorithms = (
-                    {"pubkeys": ["rsa-sha2-256", "rsa-sha2-512"]}
-                    if disable_sha2_fix
-                    else {}
-                )
+            if disable_sha2_fix:
+                sha2_pubkeys = ["rsa-sha2-256", "rsa-sha2-512"]
+                if self.disabled_algorithms is None:
+                    self.disabled_algorithms = {"pubkeys": sha2_pubkeys}
+                else:
+                    # Merge sha2_pubkeys into pubkeys and prevent duplicates
+                    current_pubkeys = self.disabled_algorithms.get("pubkeys", [])
+                    self.disabled_algorithms["pubkeys"] = list(
+                        set(current_pubkeys + sha2_pubkeys)
+                    )
 
             # For SSH proxy support
             self.ssh_config_file = ssh_config_file
@@ -1516,6 +1519,7 @@ A paramiko SSHException occurred during connection creation:
         ttp_template: Optional[str] = None,
         use_genie: bool = False,
         cmd_verify: bool = False,
+        raise_parsing_error: bool = False,
     ) -> Union[str, List[Any], Dict[str, Any]]:
         """Execute command_string on the SSH channel using a delay-based mechanism. Generally
         used for show commands.
@@ -1553,6 +1557,8 @@ A paramiko SSHException occurred during connection creation:
         :param use_genie: Process command output through PyATS/Genie parser (default: False).
 
         :param cmd_verify: Verify command echo before proceeding (default: False).
+
+        :param raise_parsing_error: Raise exception when parsing output to structured data fails.
         """
         if delay_factor is not None or max_loops is not None:
             warnings.warn(DELAY_FACTOR_DEPR_SIMPLE_MSG, DeprecationWarning)
@@ -1586,6 +1592,7 @@ A paramiko SSHException occurred during connection creation:
             use_genie=use_genie,
             textfsm_template=textfsm_template,
             ttp_template=ttp_template,
+            raise_parsing_error=raise_parsing_error,
         )
         return return_data
 
@@ -1666,6 +1673,7 @@ A paramiko SSHException occurred during connection creation:
         ttp_template: Optional[str] = None,
         use_genie: bool = False,
         cmd_verify: bool = True,
+        raise_parsing_error: bool = False,
     ) -> Union[str, List[Any], Dict[str, Any]]:
         """Execute command_string on the SSH channel using a pattern-based mechanism. Generally
         used for show commands. By default this method will keep waiting to receive data until the
@@ -1705,6 +1713,8 @@ A paramiko SSHException occurred during connection creation:
         :param use_genie: Process command output through PyATS/Genie parser (default: False).
 
         :param cmd_verify: Verify command echo before proceeding (default: True).
+
+        :param raise_parsing_error: Raise exception when parsing output to structured data fails.
         """
 
         # Time to delay in each read loop
@@ -1840,6 +1850,7 @@ You can also look at the Netmiko session_log or debug log for more information.
             use_genie=use_genie,
             textfsm_template=textfsm_template,
             ttp_template=ttp_template,
+            raise_parsing_error=raise_parsing_error,
         )
         return return_val
 
